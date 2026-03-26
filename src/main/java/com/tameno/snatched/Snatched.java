@@ -5,14 +5,15 @@ import com.tameno.snatched.config.SnatcherSettings;
 import com.tameno.snatched.entity.custom.HandSeatEntity;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
-import net.fabricmc.fabric.api.event.player.UseBlockCallback;
-import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.player.*;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleFactory;
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.entity.passive.TameableEntity;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
@@ -20,13 +21,10 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.mob.ShulkerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
+import net.minecraft.util.*;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.*;
 import net.minecraft.world.GameRules;
 import net.minecraft.world.World;
 import org.slf4j.Logger;
@@ -50,14 +48,25 @@ public class Snatched implements ModInitializer {
 		GameRuleFactory.createIntRule(100, -1)
 	);
 	public static Identifier SNATCHER_SETTINGS_SYNC_ID = new Identifier(MOD_ID, "sync_snatcher_settings");
-	public static HashMap<UUID, SnatcherSettings> allSnatcherSettings = new HashMap<UUID, SnatcherSettings>();
+	public static HashMap<UUID, SnatcherSettings> allSnatcherSettings = new HashMap<>();
 	public static final Identifier ATTACK_AIR_PACKET_ID = new Identifier(MOD_ID, "attacked_air");
+	public static final Identifier USE_NO_ITEM_ID = new Identifier(MOD_ID, "use_no_item");
 	private static Boolean isPehkuiLoaded = null;
+	private static final Digestionizer digestionizer = new Digestionizer();
+
+	public static double lerp(double a, double b, double t) {
+		return (a * (1 - t)) + (b * t);
+	}
 
 	@Override
 	public void onInitialize() {
 
 		ModEntities.registerModEntities();
+
+		ServerTickEvents.END_WORLD_TICK.register((world) -> {
+			if (world.getTime() % 10 != 0) return;
+			digestionizer.applyOnce();
+		});
 
 		ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
 			if (entity.getRootVehicle() instanceof HandSeatEntity) {
@@ -133,50 +142,92 @@ public class Snatched implements ModInitializer {
 
 		ServerPlayNetworking.registerGlobalReceiver(Snatched.ATTACK_AIR_PACKET_ID,
 				(server, player, handler, buf, responseSender) -> {
-			if (player instanceof Snatcher snatcher) {
-				final HandSeatEntity handSeat = snatcher.snatched$getCurrentHandSeat(player.getWorld());
-				if (handSeat == null) return;
-				final Entity entity = handSeat.getFirstPassenger();
-				if (entity == null) return;
+			if (!(player instanceof Snatcher snatcher)) return;
+			final HandSeatEntity handSeat = snatcher.snatched$getCurrentHandSeat(player.getWorld());
+			if (handSeat == null) return;
+			final Entity entity = handSeat.getFirstPassenger();
+			if (entity == null) return;
 
-				final Vec3d lookDirection = new Vec3d(
-					buf.readDouble(),
-					buf.readDouble(),
-					buf.readDouble()
-				);
-				final Vec3d lookDifference = new Vec3d(
-					buf.readDouble(),
-					buf.readDouble(),
-					buf.readDouble()
-				);
-				final Vec3d playerVelocity = new Vec3d(
-					buf.readDouble(),
-					buf.readDouble(),
-					buf.readDouble()
-				);
-				final double launchPower = Math.sqrt(Snatched.getSize(player));
+			final Vec3d lookDirection = new Vec3d(
+				buf.readDouble(),
+				buf.readDouble(),
+				buf.readDouble()
+			);
+			final Vec3d lookDifference = new Vec3d(
+				buf.readDouble(),
+				buf.readDouble(),
+				buf.readDouble()
+			);
+			final Vec3d playerVelocity = new Vec3d(
+				buf.readDouble(),
+				buf.readDouble(),
+				buf.readDouble()
+			);
+			final double launchPower = Math.sqrt(Snatched.getSize(player));
 
-                Vec3d velocity = lookDirection.add(lookDifference);
+			Vec3d velocity = lookDirection.add(lookDifference);
 
-                World world = player.getWorld();
-                int cappedThrowSpeed = world.getGameRules().getInt(Snatched.CAPPED_THROW_SPEED);
-                double cappedThrowSpeedProper = ((double) cappedThrowSpeed) / 100.0;
-                if (cappedThrowSpeed != -1 && velocity.length() > cappedThrowSpeedProper) {
-					velocity = velocity.normalize().multiply(cappedThrowSpeedProper);
-                }
-
-                velocity = velocity.multiply(launchPower);
-                velocity = velocity.add(playerVelocity.multiply(1.5));
-				final float motionScale = getMotionScale(entity);
-				if (motionScale != 1F) {
-					velocity = velocity.multiply(1.0 / motionScale);
-				}
-
-				entity.dismountVehicle();
-				entity.setVelocity(velocity);
-				entity.velocityDirty = true;
-				entity.velocityModified = true;
+			World world = player.getWorld();
+			int cappedThrowSpeed = world.getGameRules().getInt(Snatched.CAPPED_THROW_SPEED);
+			double cappedThrowSpeedProper = ((double) cappedThrowSpeed) / 100.0;
+			if (cappedThrowSpeed != -1 && velocity.length() > cappedThrowSpeedProper) {
+				velocity = velocity.normalize().multiply(cappedThrowSpeedProper);
 			}
+
+			velocity = velocity.multiply(launchPower);
+			velocity = velocity.add(playerVelocity.multiply(1.5));
+			final float motionScale = getMotionScale(entity);
+			if (motionScale != 1F) {
+				velocity = velocity.multiply(1.0 / motionScale);
+			}
+
+			entity.dismountVehicle();
+			entity.setVelocity(velocity);
+			entity.velocityDirty = true;
+			entity.velocityModified = true;
+		});
+
+		ServerPlayNetworking.registerGlobalReceiver(Snatched.USE_NO_ITEM_ID,
+				(server, player, handler, buf, responseSender) -> {
+			if (!(player instanceof Snatcher snatcher)) return;
+			final HandSeatEntity handSeat = snatcher.snatched$getCurrentHandSeat(player.getWorld());
+			if (handSeat == null) return;
+			final Entity entity = handSeat.getFirstPassenger();
+			if (entity == null) return;
+
+			boolean startUsing = buf.readBoolean();
+			if (startUsing) {
+				// Ignore time stuff for now, just instant eat
+				return;
+			}
+
+			if (!(entity instanceof LivingEntity living)) return;
+			if (entity instanceof TameableEntity tameable && tameable.isTamed()) return;
+
+			// float yourMaxHealth = 800f;
+			float yourMaxHealth = player.getMaxHealth();
+			if (yourMaxHealth <= 0f) {
+				yourMaxHealth = 0.0001f;
+			}
+			float itsMaxHealth = living.getMaxHealth();
+			if (itsMaxHealth <= 0f) {
+				itsMaxHealth = 0.0001f;
+			}
+			float itsHealth = living.getHealth();
+
+			final double HEALTH_IMPORTANCE = 0.3;
+			final double FILLING_MULTIPLIER = 12.0;
+
+			double itsBigness = lerp(getSize(entity), itsMaxHealth, HEALTH_IMPORTANCE);
+			double haunches = (
+				itsBigness
+				* (itsHealth / itsMaxHealth)
+				/ Math.pow(yourMaxHealth, 0.33)
+				* FILLING_MULTIPLIER
+			);
+			digestionizer.add(player, (int) (haunches * 2.0));
+			entity.kill();
+			Snatched.LOGGER.info("Haunches: {}", haunches);
 		});
 
 		ServerPlayNetworking.registerGlobalReceiver(Snatched.SNATCHER_SETTINGS_SYNC_ID,

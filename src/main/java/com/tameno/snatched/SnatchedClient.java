@@ -13,6 +13,7 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
+import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.util.math.Vec3d;
 
@@ -21,6 +22,7 @@ import java.util.UUID;
 public class SnatchedClient implements ClientModInitializer {
 
     private boolean wasAttacking = false;
+    private boolean wasUsing = false;
 
     private Vec3d lastLookingVector = new Vec3d(0, 0, 0);
 
@@ -49,36 +51,59 @@ public class SnatchedClient implements ClientModInitializer {
         });
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (client.player == null) return;
-            boolean isAttacking = client.options.attackKey.isPressed();
-            boolean hasNoTarget = client.crosshairTarget == null || client.crosshairTarget.getType() == net.minecraft.util.hit.HitResult.Type.MISS;
-            if (isAttacking && hasNoTarget) {
-                if (wasAttacking) return;
-                wasAttacking = true;
-
-                final Vec3d lookDirection = client.player.getRotationVector();
-                final Vec3d lookDifference = lookDirection.subtract(lastLookingVector);
-                final Vec3d velocity = client.player.getVelocity();
-
-                PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
-
-                buf.writeDouble(lookDirection.x);
-                buf.writeDouble(lookDirection.y);
-                buf.writeDouble(lookDirection.z);
-
-                buf.writeDouble(lookDifference.x);
-                buf.writeDouble(lookDifference.y);
-                buf.writeDouble(lookDifference.z);
-
-                buf.writeDouble(velocity.getX());
-                buf.writeDouble(velocity.getY());
-                buf.writeDouble(velocity.getZ());
-
-                ClientPlayNetworking.send(Snatched.ATTACK_AIR_PACKET_ID, buf);
-            } else {
-                wasAttacking = false;
-            }
-            lastLookingVector = client.player.getRotationVector();
+            checkToThrow(client);
+            checkToEat(client);
         });
     }
+
+    private void checkToThrow(MinecraftClient client) {
+        if (client.player == null) return;
+        boolean isAttacking = client.options.attackKey.isPressed();
+        boolean hasNoTarget = client.crosshairTarget == null || client.crosshairTarget.getType() == net.minecraft.util.hit.HitResult.Type.MISS;
+        if (isAttacking && hasNoTarget) {
+            if (wasAttacking) return;
+            wasAttacking = true;
+
+            final Vec3d lookDirection = client.player.getRotationVector();
+            final Vec3d lookDifference = lookDirection.subtract(lastLookingVector);
+            final Vec3d velocity = client.player.getVelocity();
+
+            PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
+
+            buf.writeDouble(lookDirection.x);
+            buf.writeDouble(lookDirection.y);
+            buf.writeDouble(lookDirection.z);
+
+            buf.writeDouble(lookDifference.x);
+            buf.writeDouble(lookDifference.y);
+            buf.writeDouble(lookDifference.z);
+
+            buf.writeDouble(velocity.getX());
+            buf.writeDouble(velocity.getY());
+            buf.writeDouble(velocity.getZ());
+
+            ClientPlayNetworking.send(Snatched.ATTACK_AIR_PACKET_ID, buf);
+        } else {
+            wasAttacking = false;
+        }
+        lastLookingVector = client.player.getRotationVector();
+    }
+
+    private void checkToEat(MinecraftClient client) {
+        ClientPlayerEntity player = client.player;
+        if (player == null) return;
+        boolean canUse = (
+            client.options.useKey.isPressed()
+            && !player.isUsingSpyglass()
+            && !player.isUsingItem()
+            && !player.isUsingRiptide()
+        );
+        if (canUse != wasUsing) {
+            wasUsing = canUse;
+            PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
+            buf.writeBoolean(canUse);
+            ClientPlayNetworking.send(Snatched.USE_NO_ITEM_ID, buf);
+        }
+    }
+
 }
