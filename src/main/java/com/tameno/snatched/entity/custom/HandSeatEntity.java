@@ -29,12 +29,15 @@ public class HandSeatEntity extends Entity {
     private static final TrackedData<Integer> EATING_TICKS = DataTracker.registerData(HandSeatEntity.class, TrackedDataHandlerRegistry.INTEGER);
 
     private static final int EATING_DURATION = 32;
+    private static final int EATING_START_DELAY = 5; // Time in ticks to not allow eating a picked up entity
 
     private PlayerEntity handOwner;
+    private final long insiationTick;
 
     public HandSeatEntity(EntityType<?> entityType, World world) {
         super(entityType, world);
         this.noClip = true;
+        this.insiationTick = getWorld().getTime();
         Optional<java.util.UUID> handOwnerId = this.dataTracker.get(HAND_OWNER_ID);
         if (handOwnerId.isPresent()) {
             this.handOwner = this.getWorld().getPlayerByUuid(handOwnerId.get());
@@ -78,6 +81,8 @@ public class HandSeatEntity extends Entity {
 
     public void startEating() {
         if (dataTracker.get(EATING_TICKS) > 0) return;
+        long now = getWorld().getTime();
+        if (now - insiationTick <= EATING_START_DELAY) return;
         dataTracker.set(EATING_TICKS, 1);
     }
 
@@ -152,12 +157,12 @@ public class HandSeatEntity extends Entity {
             this.handOwner.getWorld() != this.getWorld()
         );
 
-        // if (this.getWorld().isClient()) {
-        //     if (!isValid) {
-        //         return;
-        //     }
-        //     updateHandPosition();
-        // }
+        if (this.getWorld().isClient()) {
+            if (!isValid) {
+                return;
+            }
+            updateHandPosition();
+        }
 
         if (!isValid) {
             this.discard();
