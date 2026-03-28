@@ -65,7 +65,7 @@ public class HandSeatEntity extends Entity {
         if (ticks > 0) {
             Vec3d mouthPos = this.handOwner.getPos();
             mouthPos = mouthPos.add(0, this.handOwner.getEyeHeight(this.handOwner.getPose()) - passenger.getHeight() * 2.0, 0);
-            pos = mouthPos.lerp(pos, (double) ticks / (double) EATING_DURATION);
+            pos = pos.lerp(mouthPos, (double) ticks / (double) EATING_DURATION);
         }
 
         this.setPosition(pos);
@@ -73,10 +73,11 @@ public class HandSeatEntity extends Entity {
 
     public void startEating() {
         if (dataTracker.get(EATING_TICKS) > 0) return;
-        dataTracker.set(EATING_TICKS, EATING_DURATION);
+        dataTracker.set(EATING_TICKS, 1);
     }
 
     public void stopEating() {
+        if (dataTracker.get(EATING_TICKS) >= EATING_DURATION) return;
         dataTracker.set(EATING_TICKS, 0);
     }
 
@@ -158,11 +159,10 @@ public class HandSeatEntity extends Entity {
         }
 
         int ticks = dataTracker.get(EATING_TICKS);
-        if (ticks > 0) {
-            ticks -= 1;
-            dataTracker.set(EATING_TICKS, ticks);
+        if (ticks > 0 && ticks < EATING_DURATION) {
+            ticks += 1;
 
-            if (ticks % 4 == 0 && ticks > 0) {
+            if (ticks % 4 == 0) {
                 getWorld().playSound(
                     null,
                     handOwner.getX(),
@@ -175,9 +175,11 @@ public class HandSeatEntity extends Entity {
                 );
             }
 
-            if (ticks == 0) {
+            if (ticks >= EATING_DURATION) {
                 finishEating();
             }
+
+            dataTracker.set(EATING_TICKS, ticks);
         }
 
         updateHandPosition();
