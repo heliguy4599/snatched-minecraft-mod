@@ -42,10 +42,12 @@ public class HandSeatEntity extends Entity {
     }
 
     public void updateHandPosition() {
+        final Entity passenger = this.getFirstPassenger();
+        if (passenger == null) return;
         SnatcherSettings settings = ((Snatcher) this.handOwner).snatched$getSnatcherSettings();
 
         double ownerSize = Snatched.getSize(this.handOwner);
-        double passengerSize = Snatched.getSize(this.getFirstPassenger());
+        double passengerSize = Snatched.getSize(passenger);
         double distance = ownerSize + passengerSize * 2.0;
         double side = 1.0;
         if (settings.flipWhenUsingLeftHandAsMainHand && this.handOwner.getMainArm() == Arm.LEFT) {
@@ -62,7 +64,7 @@ public class HandSeatEntity extends Entity {
         final int ticks = dataTracker.get(EATING_TICKS);
         if (ticks > 0) {
             Vec3d mouthPos = this.handOwner.getPos();
-            mouthPos = mouthPos.add(0, this.handOwner.getEyeHeight(this.handOwner.getPose()) - passengerSize / 2.0, 0);
+            mouthPos = mouthPos.add(0, this.handOwner.getEyeHeight(this.handOwner.getPose()) - passenger.getHeight() * 2.0, 0);
             pos = mouthPos.lerp(pos, (double) ticks / (double) EATING_DURATION);
         }
 
