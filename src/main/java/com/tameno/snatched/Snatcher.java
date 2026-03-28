@@ -12,4 +12,6 @@ public interface Snatcher {
     public HandSeatEntity snatched$getCurrentHandSeat(World world);
 
     public SnatcherSettings snatched$getSnatcherSettings();
+
+    public void addFoodLevel(int foodLevel);
 }

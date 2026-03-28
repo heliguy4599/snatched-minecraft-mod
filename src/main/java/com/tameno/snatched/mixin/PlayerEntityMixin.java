@@ -18,11 +18,15 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.Objects;
 import java.util.UUID;
 
 @Mixin(PlayerEntity.class)
 public abstract class PlayerEntityMixin extends LivingEntity implements Snatcher {
+
+    @Unique private static final int FOOD_REPLENISH_TICK_MODULO = 20;
 
     @Shadow public abstract void startFallFlying();
 
@@ -36,10 +40,24 @@ public abstract class PlayerEntityMixin extends LivingEntity implements Snatcher
 
     @Shadow public abstract void setFireTicks(int fireTicks);
 
+    @Unique private int foodLevelToAdd = 0;
+
     @Unique private UUID snatched$currentHandSeatUuid;
 
     protected PlayerEntityMixin(EntityType<? extends LivingEntity> entityType, World world) {
         super(entityType, world);
+    }
+
+    @Inject(method = "tick", at = @At("HEAD"))
+    public void snatchedPlayerTick(CallbackInfo callbackInfo) {
+        if (getWorld().getTime() % FOOD_REPLENISH_TICK_MODULO != 0) return;
+        if (this.foodLevelToAdd <= 0) return;
+        ((PlayerEntity) (Object) this).getHungerManager().add(1, 20);
+        this.foodLevelToAdd -= 1;
+    }
+
+    public void addFoodLevel(int foodLevel) {
+        this.foodLevelToAdd += foodLevel;
     }
 
     public void snatched$setCurrentHandSeat(HandSeatEntity newHandSeat) {

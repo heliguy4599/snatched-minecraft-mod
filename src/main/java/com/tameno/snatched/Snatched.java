@@ -52,21 +52,11 @@ public class Snatched implements ModInitializer {
 	public static final Identifier ATTACK_AIR_PACKET_ID = new Identifier(MOD_ID, "attacked_air");
 	public static final Identifier USE_NO_ITEM_ID = new Identifier(MOD_ID, "use_no_item");
 	private static Boolean isPehkuiLoaded = null;
-	private static final Digestionizer digestionizer = new Digestionizer();
-
-	public static double lerp(double a, double b, double t) {
-		return (a * (1 - t)) + (b * t);
-	}
 
 	@Override
 	public void onInitialize() {
 
 		ModEntities.registerModEntities();
-
-		ServerTickEvents.END_WORLD_TICK.register((world) -> {
-			if (world.getTime() % 10 != 0) return;
-			digestionizer.applyOnce();
-		});
 
 		ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
 			if (entity.getRootVehicle() instanceof HandSeatEntity) {
@@ -196,38 +186,15 @@ public class Snatched implements ModInitializer {
 			if (entity == null) return;
 
 			boolean startUsing = buf.readBoolean();
-			if (startUsing) {
-				// Ignore time stuff for now, just instant eat
+			if (!startUsing) {
+				handSeat.stopEating();
 				return;
 			}
 
-			if (!(entity instanceof LivingEntity living)) return;
+			if (!(entity instanceof LivingEntity)) return;
 			if (entity instanceof TameableEntity tameable && tameable.isTamed()) return;
 
-			// float yourMaxHealth = 800f;
-			float yourMaxHealth = player.getMaxHealth();
-			if (yourMaxHealth <= 0f) {
-				yourMaxHealth = 0.0001f;
-			}
-			float itsMaxHealth = living.getMaxHealth();
-			if (itsMaxHealth <= 0f) {
-				itsMaxHealth = 0.0001f;
-			}
-			float itsHealth = living.getHealth();
-
-			final double HEALTH_IMPORTANCE = 0.3;
-			final double FILLING_MULTIPLIER = 12.0;
-
-			double itsBigness = lerp(getSize(entity), itsMaxHealth, HEALTH_IMPORTANCE);
-			double haunches = (
-				itsBigness
-				* (itsHealth / itsMaxHealth)
-				/ Math.pow(yourMaxHealth, 0.33)
-				* FILLING_MULTIPLIER
-			);
-			digestionizer.add(player, (int) (haunches * 2.0));
-			entity.kill();
-			Snatched.LOGGER.info("Haunches: {}", haunches);
+			handSeat.startEating();
 		});
 
 		ServerPlayNetworking.registerGlobalReceiver(Snatched.SNATCHER_SETTINGS_SYNC_ID,

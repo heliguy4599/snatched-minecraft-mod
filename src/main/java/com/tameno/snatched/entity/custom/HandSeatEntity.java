@@ -1,18 +1,18 @@
 package com.tameno.snatched.entity.custom;
 
-import com.tameno.snatched.Snatched;
-import com.tameno.snatched.Snatcher;
+import com.tameno.snatched.*;
 import com.tameno.snatched.config.SnatcherSettings;
 import net.minecraft.block.piston.PistonBehavior;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
+import net.minecraft.entity.*;
 import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
+import net.minecraft.sound.*;
 import net.minecraft.util.Arm;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import java.util.Optional;
@@ -21,6 +21,9 @@ import java.util.UUID;
 public class HandSeatEntity extends Entity {
 
     private static final TrackedData<Optional<UUID>> HAND_OWNER_ID = DataTracker.registerData(HandSeatEntity.class, TrackedDataHandlerRegistry.OPTIONAL_UUID);
+    private static final TrackedData<Integer> EATING_TICKS = DataTracker.registerData(HandSeatEntity.class, TrackedDataHandlerRegistry.INTEGER);
+
+    private static final int EATING_DURATION = 32;
 
     private PlayerEntity handOwner;
 
@@ -56,7 +59,67 @@ public class HandSeatEntity extends Entity {
         pos = pos.add(this.handOwner.getPos());
         pos = pos.add(0,  this.handOwner.getEyeHeight(this.handOwner.getPose()) - passengerSize / 2.0, 0);
 
+        final int ticks = dataTracker.get(EATING_TICKS);
+        if (ticks > 0) {
+            Vec3d mouthPos = this.handOwner.getPos();
+            mouthPos = mouthPos.add(0, this.handOwner.getEyeHeight(this.handOwner.getPose()) - passengerSize / 2.0, 0);
+            pos = mouthPos.lerp(pos, (double) ticks / (double) EATING_DURATION);
+        }
+
         this.setPosition(pos);
+    }
+
+    public void startEating() {
+        if (dataTracker.get(EATING_TICKS) > 0) return;
+        dataTracker.set(EATING_TICKS, EATING_DURATION);
+    }
+
+    public void stopEating() {
+        dataTracker.set(EATING_TICKS, 0);
+    }
+
+    private void finishEating() {
+        if (getWorld().isClient) return;
+        Entity toEat = getFirstPassenger();
+        if (!(toEat instanceof LivingEntity living)) return;
+        float yourMaxHealth = handOwner.getMaxHealth();
+        if (yourMaxHealth <= 0f) {
+            yourMaxHealth = 0.0001f;
+        }
+        float itsMaxHealth = living.getMaxHealth();
+        if (itsMaxHealth <= 0f) {
+            itsMaxHealth = 0.0001f;
+        }
+        float itsHealth = living.getHealth();
+
+        final double HEALTH_IMPORTANCE = 0.3;
+        final double FILLING_MULTIPLIER = 12.0;
+
+        double itsBigness = MathHelper.lerp(Snatched.getSize(living), itsMaxHealth, HEALTH_IMPORTANCE);
+        double haunches = (
+            itsBigness
+            * (itsHealth / itsMaxHealth)
+            / Math.pow(yourMaxHealth, 0.33)
+            * FILLING_MULTIPLIER
+        );
+
+        if (handOwner instanceof Snatcher snatcher) {
+            int foodLevel = (int) (haunches * 2.0);
+            Snatched.LOGGER.info("Adding {}...", foodLevel);
+            snatcher.addFoodLevel(foodLevel);
+        }
+        living.kill();
+
+        getWorld().playSound(
+            null,
+            handOwner.getX(),
+            handOwner.getY(),
+            handOwner.getZ(),
+            SoundEvents.ENTITY_PLAYER_BURP,
+            SoundCategory.PLAYERS,
+            0.5f,
+            getWorld().getRandom().nextFloat() * 0.1f + 0.9f
+        );
     }
 
     @Override
@@ -76,16 +139,39 @@ public class HandSeatEntity extends Entity {
             this.handOwner.getWorld() != this.getWorld()
         );
 
-        if (this.getWorld().isClient()) {
-            if (!isValid) {
-                return;
-            }
-            updateHandPosition();
-        }
+        // if (this.getWorld().isClient()) {
+        //     if (!isValid) {
+        //         return;
+        //     }
+        //     updateHandPosition();
+        // }
 
         if (!isValid) {
             this.discard();
             return;
+        }
+
+        int ticks = dataTracker.get(EATING_TICKS);
+        if (ticks > 0) {
+            ticks -= 1;
+            dataTracker.set(EATING_TICKS, ticks);
+
+            if (ticks % 4 == 0 && ticks > 0) {
+                getWorld().playSound(
+                    null,
+                    handOwner.getX(),
+                    handOwner.getY(),
+                    handOwner.getZ(),
+                    SoundEvents.ENTITY_GENERIC_EAT,
+                    SoundCategory.PLAYERS,
+                    0.5f + 0.5f * getWorld().getRandom().nextInt(2),
+                    (getWorld().getRandom().nextFloat() - getWorld().getRandom().nextFloat()) * 0.2f + 1.0f
+                );
+            }
+
+            if (ticks == 0) {
+                finishEating();
+            }
         }
 
         updateHandPosition();
@@ -118,6 +204,7 @@ public class HandSeatEntity extends Entity {
             handOwnerId = Optional.of(this.handOwner.getUuid());
         }
         this.dataTracker.startTracking(HAND_OWNER_ID, handOwnerId);
+        this.dataTracker.startTracking(EATING_TICKS, 0);
     }
 
     @Override
