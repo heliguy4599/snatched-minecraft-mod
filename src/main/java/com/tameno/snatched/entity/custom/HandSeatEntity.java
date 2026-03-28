@@ -29,7 +29,7 @@ public class HandSeatEntity extends Entity {
     private static final TrackedData<Integer> EATING_TICKS = DataTracker.registerData(HandSeatEntity.class, TrackedDataHandlerRegistry.INTEGER);
 
     private static final int EATING_DURATION = 32;
-    private static final int EATING_START_DELAY = 5; // Time in ticks to not allow eating a picked up entity
+    private static final int EATING_START_DELAY = 1; // Time in ticks to not allow eating a picked up entity
 
     private PlayerEntity handOwner;
     private final long insiationTick;
