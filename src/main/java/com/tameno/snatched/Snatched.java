@@ -13,6 +13,7 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.entity.damage.DamageType;
 import net.minecraft.entity.passive.TameableEntity;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.block.BlockState;
@@ -20,6 +21,8 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.mob.ShulkerEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.*;
 import net.minecraft.util.hit.BlockHitResult;
@@ -46,6 +49,10 @@ public class Snatched implements ModInitializer {
 		"snatchedCappedThrowSpeed",
 		GameRules.Category.PLAYER,
 		GameRuleFactory.createIntRule(100, -1)
+	);
+	public static final RegistryKey<DamageType> DEVOURED = RegistryKey.of(
+		RegistryKeys.DAMAGE_TYPE,
+		new Identifier(MOD_ID, "devoured")
 	);
 	public static Identifier SNATCHER_SETTINGS_SYNC_ID = new Identifier(MOD_ID, "sync_snatcher_settings");
 	public static HashMap<UUID, SnatcherSettings> allSnatcherSettings = new HashMap<>();

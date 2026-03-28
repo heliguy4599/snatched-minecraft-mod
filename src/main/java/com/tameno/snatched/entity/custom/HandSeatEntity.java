@@ -4,12 +4,15 @@ import com.tameno.snatched.*;
 import com.tameno.snatched.config.SnatcherSettings;
 import net.minecraft.block.piston.PistonBehavior;
 import net.minecraft.entity.*;
+import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.sound.*;
 import net.minecraft.util.Arm;
 import net.minecraft.util.math.MathHelper;
@@ -123,7 +126,13 @@ public class HandSeatEntity extends Entity {
             getWorld().getRandom().nextFloat() * 0.1f + 0.9f
         );
 
-        living.kill();
+        DamageSource source = new DamageSource(
+            getWorld().getRegistryManager()
+            .get(RegistryKeys.DAMAGE_TYPE)
+            .entryOf(Snatched.DEVOURED),
+            this.handOwner
+        );
+        living.damage(source, Float.MAX_VALUE);
     }
 
     @Override
