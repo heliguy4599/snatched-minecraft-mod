@@ -95,7 +95,11 @@ public class HandSeatEntity extends Entity {
         final double HEALTH_IMPORTANCE = 0.3;
         final double FILLING_MULTIPLIER = 12.0;
 
-        double itsBigness = MathHelper.lerp(Snatched.getSize(living), itsMaxHealth, HEALTH_IMPORTANCE);
+        double itsBigness = MathHelper.lerp(HEALTH_IMPORTANCE, Snatched.getSize(living), itsMaxHealth);
+        Snatched.LOGGER.info("bigness: {}", itsBigness);
+        Snatched.LOGGER.info("itsHealth: {}", itsHealth);
+        Snatched.LOGGER.info("itsMaxHealth: {}", itsMaxHealth);
+        Snatched.LOGGER.info("Math pow stuff: {}", Math.pow(yourMaxHealth, 0.33));
         double haunches = (
             itsBigness
             * (itsHealth / itsMaxHealth)
