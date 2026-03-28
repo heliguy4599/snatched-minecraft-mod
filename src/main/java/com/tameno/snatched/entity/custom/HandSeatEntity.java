@@ -15,6 +15,8 @@ import net.minecraft.util.Arm;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import org.lwjgl.system.macosx.LibC;
+
 import java.util.Optional;
 import java.util.UUID;
 
@@ -59,12 +61,12 @@ public class HandSeatEntity extends Entity {
         pos = pos.rotateX(this.handOwner.getPitch() * -0.01745329251f);
         pos = pos.rotateY(this.handOwner.getYaw() * -0.01745329251f);
         pos = pos.add(this.handOwner.getPos());
-        pos = pos.add(0,  this.handOwner.getEyeHeight(this.handOwner.getPose()) - passengerSize / 2.0, 0);
+        pos = pos.add(0, this.handOwner.getEyeHeight(this.handOwner.getPose()) - passengerSize / 2.0, 0);
 
         final int ticks = dataTracker.get(EATING_TICKS);
         if (ticks > 0) {
             Vec3d mouthPos = this.handOwner.getPos();
-            mouthPos = mouthPos.add(0, this.handOwner.getEyeHeight(this.handOwner.getPose()) - passenger.getHeight() * 2.0, 0);
+            mouthPos = mouthPos.add(0, (this.handOwner.getEyeHeight(this.handOwner.getPose()) * 0.9) - passenger.getHeight(), 0);
             pos = pos.lerp(mouthPos, (double) ticks / (double) EATING_DURATION);
         }
 
@@ -99,10 +101,6 @@ public class HandSeatEntity extends Entity {
         final double FILLING_MULTIPLIER = 12.0;
 
         double itsBigness = MathHelper.lerp(HEALTH_IMPORTANCE, Snatched.getSize(living), itsMaxHealth);
-        Snatched.LOGGER.info("bigness: {}", itsBigness);
-        Snatched.LOGGER.info("itsHealth: {}", itsHealth);
-        Snatched.LOGGER.info("itsMaxHealth: {}", itsMaxHealth);
-        Snatched.LOGGER.info("Math pow stuff: {}", Math.pow(yourMaxHealth, 0.33));
         double haunches = (
             itsBigness
             * (itsHealth / itsMaxHealth)
@@ -111,11 +109,8 @@ public class HandSeatEntity extends Entity {
         );
 
         if (handOwner instanceof Snatcher snatcher) {
-            int foodLevel = (int) (haunches * 2.0);
-            Snatched.LOGGER.info("Adding {}...", foodLevel);
-            snatcher.addFoodLevel(foodLevel);
+            snatcher.addFoodLevel((int) (haunches * 2.0));
         }
-        living.kill();
 
         getWorld().playSound(
             null,
@@ -127,6 +122,8 @@ public class HandSeatEntity extends Entity {
             0.5f,
             getWorld().getRandom().nextFloat() * 0.1f + 0.9f
         );
+
+        living.kill();
     }
 
     @Override
@@ -159,7 +156,11 @@ public class HandSeatEntity extends Entity {
         }
 
         int ticks = dataTracker.get(EATING_TICKS);
-        if (ticks > 0 && ticks < EATING_DURATION) {
+        if (ticks >= EATING_DURATION) {
+            if (this.getFirstPassenger() instanceof LivingEntity living && living.isAlive()) {
+                this.discard();
+            }
+        } else if (ticks > 0) {
             ticks += 1;
 
             if (ticks % 4 == 0) {
