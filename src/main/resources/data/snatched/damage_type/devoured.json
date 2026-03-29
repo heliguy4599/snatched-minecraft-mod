@@ -1,5 +1,6 @@
 {
 	"message_id": "devoured",
 	"scaling": "never",
-	"exhaustion": 0.0
+	"exhaustion": 0.0,
+	"death_message_type": "default"
 }

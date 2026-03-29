@@ -105,11 +105,11 @@ public class HandSeatEntity extends Entity {
         }
         float itsHealth = living.getHealth();
 
-        final double HEALTH_IMPORTANCE = 0.3;
-        final double FILLING_MULTIPLIER = 12.0;
+        final double HEALTH_IMPORTANCE = 0.25;
+        final double FILLING_MULTIPLIER = 16.0;
 
         double itsBigness = MathHelper.lerp(HEALTH_IMPORTANCE, Snatched.getSize(living), itsMaxHealth);
-        double haunches = (
+        double foodLevel = (
             itsBigness
             * (itsHealth / itsMaxHealth)
             / Math.pow(yourMaxHealth, 0.33)
@@ -117,7 +117,7 @@ public class HandSeatEntity extends Entity {
         );
 
         if (handOwner instanceof Snatcher snatcher) {
-            snatcher.addFoodLevel((int) (haunches * 2.0));
+            snatcher.addFoodLevel((int) Math.ceil(foodLevel));
         }
 
         getWorld().playSound(
@@ -135,6 +135,7 @@ public class HandSeatEntity extends Entity {
             getWorld().getRegistryManager()
             .get(RegistryKeys.DAMAGE_TYPE)
             .entryOf(Snatched.DEVOURED),
+            this.handOwner,
             this.handOwner
         );
         living.damage(source, Float.MAX_VALUE);

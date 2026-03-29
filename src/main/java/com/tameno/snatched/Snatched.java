@@ -15,6 +15,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.entity.damage.DamageType;
 import net.minecraft.entity.passive.TameableEntity;
+import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
@@ -42,6 +43,11 @@ public class Snatched implements ModInitializer {
     public static Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 	public static final GameRules.Key<GameRules.IntRule> SIZE_THRESHOLD = GameRuleRegistry.register(
 		"snatchedSizeThreshold",
+		GameRules.Category.PLAYER,
+		GameRuleFactory.createIntRule(75, -1)
+	);
+	public static final GameRules.Key<GameRules.IntRule> EATING_THRESHOLD = GameRuleRegistry.register(
+		"snatchedEatingThreshold",
 		GameRules.Category.PLAYER,
 		GameRuleFactory.createIntRule(75, -1)
 	);
@@ -200,6 +206,13 @@ public class Snatched implements ModInitializer {
 
 			if (!(entity instanceof LivingEntity)) return;
 			if (entity instanceof TameableEntity tameable && tameable.isTamed()) return;
+
+			final int eatingThreshold = server.getGameRules().getInt(EATING_THRESHOLD);
+			if (eatingThreshold != -1) {
+				double eatingThresholdProper = ((double) eatingThreshold) / 100.0;
+				double ratio = getSize(entity) / getSize(player);
+				if (ratio >= eatingThresholdProper) return;
+			}
 
 			handSeat.startEating();
 		});

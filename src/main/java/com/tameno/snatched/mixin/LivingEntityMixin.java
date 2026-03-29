@@ -1,5 +1,6 @@
 package com.tameno.snatched.mixin;
 
+import com.tameno.snatched.Snatched;
 import com.tameno.snatched.entity.custom.HandSeatEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
@@ -31,6 +32,13 @@ public abstract class LivingEntityMixin extends Entity {
     private void canHitAndIsntSnatched(CallbackInfoReturnable<Boolean> callbackInfo) {
         if (this.getRootVehicle() instanceof HandSeatEntity) {
             callbackInfo.setReturnValue(false);
+        }
+    }
+
+    @Inject(method = "dropLoot", at = @At("HEAD"), cancellable = true)
+    private void snatchedLivingEntityMixinDropLoot(DamageSource source, boolean _causedByPlayer, CallbackInfo ci) {
+        if (source.isOf(Snatched.DEVOURED)) {
+            ci.cancel();
         }
     }
 }
