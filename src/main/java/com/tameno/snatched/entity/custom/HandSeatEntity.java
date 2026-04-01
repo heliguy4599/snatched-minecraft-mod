@@ -138,7 +138,8 @@ public class HandSeatEntity extends Entity {
             this.handOwner,
             this.handOwner
         );
-        living.damage(source, Float.MAX_VALUE);
+        living.setHealth(0.01f);
+        living.damage(source, 1f);
     }
 
     @Override
